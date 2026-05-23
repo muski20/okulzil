@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Okul Zil — Uzaktan Kontrol</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --bg2: #1e293b;
+    --bg3: #334155;
+    --accent: #f59e0b;
+    --accent2: #fbbf24;
+    --text: #f1f5f9;
+    --text2: #94a3b8;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100dvh; }
+
+  /* PIN ekranı — mobil numpad stili */
+  .pin-display {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin: 8px 0;
+  }
+  .pin-dot {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .pin-dot.filled { background: var(--accent); }
+
+  .numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+    max-width: 280px;
+  }
+  .num-btn {
+    background: var(--bg2);
+    border: 1px solid var(--bg3);
+    border-radius: 50%;
+    width: 72px; height: 72px;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text1);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, transform 0.1s;
+    user-select: none;
+  }
+  .num-btn:active { background: var(--accent); transform: scale(0.93); }
+  .num-btn.del    { font-size: 1.2rem; color: var(--warn); }
+  .num-btn.empty  { visibility: hidden; }
+
+  #pinScreen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100dvh; padding: 24px; gap: 20px;
+  }
+  #pinScreen .logo { font-size: 3rem; }
+  #pinScreen h1 { font-size: 1.4rem; font-weight: 700; text-align: center; }
+  #pinScreen p { font-size: 0.85rem; color: var(--text2); text-align: center; }
+
+  #pinMsg { font-size: 0.85rem; color: var(--danger); min-height: 20px; text-align: center; }
+  .btn-big {
+    width: 100%; max-width: 260px; padding: 14px; border: none; border-radius: var(--radius);
+    font-size: 1rem; font-weight: 600; cursor: pointer; transition: filter 0.15s, transform 0.1s;
+  }
+  .btn-big:active { transform: scale(0.96); filter: brightness(0.85); }
+  .btn-primary-big { background: var(--accent); color: #000; }
+
+  /* Ana ekran */
+  #mainScreen { display: none; flex-direction: column; min-height: 100dvh; }
+
+  /* Header */
+  .rm-header {
+    background: var(--bg2); padding: 12px 16px; display: flex; align-items: center;
+    justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--bg3);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .rm-header .title { font-size: 1rem; font-weight: 700; }
+  .rm-conn-dot {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--bg3);
+    transition: background 0.3s;
+  }
+  .rm-conn-dot.connected { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .rm-conn-dot.error     { background: var(--danger); }
+
+  /* Sekmeler */
+  .rm-tabs {
+    display: flex; background: var(--bg2); border-bottom: 1px solid var(--bg3);
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .rm-tabs::-webkit-scrollbar { display: none; }
+  .rm-tab {
+    flex: 1; min-width: 80px; padding: 10px 6px; border: none; background: none;
+    color: var(--text2); font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap;
+  }
+  .rm-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Sekme içeriği */
+  .rm-content { flex: 1; padding: 16px; overflow-y: auto; }
+  .rm-page { display: none; }
+  .rm-page.active { display: block; }
+
+  /* Zil butonları */
+  .bell-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .bell-card {
+    background: var(--bg2); border-radius: var(--radius); padding: 16px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    cursor: pointer; border: 2px solid var(--bg3); transition: border-color 0.15s, transform 0.1s;
+    user-select: none;
+  }
+  .bell-card:active { transform: scale(0.95); border-color: var(--accent); }
+  .bell-card.playing { border-color: var(--accent); background: rgba(251,146,60,0.15); box-shadow: 0 0 10px rgba(251,146,60,0.3); }
+  .bell-card .icon { font-size: 2rem; }
+  .bell-card .label { font-size: 0.85rem; font-weight: 600; text-align: center; }
+  .bell-card .sublabel { font-size: 0.72rem; color: var(--text2); text-align: center; }
+
+  /* Tören butonları */
+  .cer-list { display: flex; flex-direction: column; gap: 10px; }
+  .cer-card {
+    background: var(--bg2); border-radius: var(--radius); padding: 14px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    border: 2px solid var(--bg3); cursor: pointer; transition: border-color 0.15s, transform 0.1s;
+    user-select: none;
+  }
+  .cer-card:active { transform: scale(0.97); border-color: var(--accent); }
+  .cer-card.playing { border-color: var(--accent); background: rgba(251,146,60,0.15); box-shadow: 0 0 10px rgba(251,146,60,0.3); }
+  .cer-card.emergency { border-color: #ef444444; }
+  .cer-card.emergency:active { border-color: var(--danger); }
+  .cer-card .cer-label { font-size: 0.9rem; font-weight: 600; }
+  .cer-card .cer-play { font-size: 1.3rem; }
+
+  /* Durdur butonu */
+  .stop-zone { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+  .btn-stop-big {
+    width: 100%; max-width: 320px; padding: 20px; border: none;
+    border-radius: var(--radius); background: var(--danger); color: #fff;
+    font-size: 1.1rem; font-weight: 700; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; gap: 10px;
+    transition: filter 0.15s, transform 0.1s;
+  }
+  .btn-stop-big:active { transform: scale(0.96); filter: brightness(0.85); }
+
+  /* Anons sayfası */
+  .anons-zone { display: flex; flex-direction: column; gap: 14px; align-items: center; }
+  #recordBtn {
+    width: 120px; height: 120px; border-radius: 50%; border: 4px solid var(--accent);
+    background: var(--bg2); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s; font-size: 2.5rem; user-select: none;
+  }
+  #recordBtn.recording {
+    background: #ef444422; border-color: var(--danger);
+    animation: pulse-rec 1s ease-in-out infinite;
+  }
+  @keyframes pulse-rec { 0%,100% { box-shadow: 0 0 0 0 #ef444455; } 50% { box-shadow: 0 0 0 16px #ef444400; } }
+  #recordLabel { font-size: 0.85rem; color: var(--text2); }
+  #recordTimer { font-size: 1.5rem; font-weight: 700; color: var(--accent); min-height: 36px; }
+  #sendBtn {
+    width: 100%; max-width: 260px; padding: 14px; border: none;
+    border-radius: var(--radius); background: var(--success); color: #fff;
+    font-size: 1rem; font-weight: 700; cursor: pointer; display: none;
+    transition: filter 0.15s, transform 0.1s;
+  }
+  #sendBtn:active { transform: scale(0.97); filter: brightness(0.85); }
+  #anonsMsg { font-size: 0.85rem; color: var(--text2); text-align: center; min-height: 20px; }
+
+  /* Bölüm başlığı */
+  .section-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--text2); margin-bottom: 10px; }
+
+  /* Durum çubuğu */
+  #statusBar {
+    background: var(--bg2); border-top: 1px solid var(--bg3); padding: 8px 16px;
+    font-size: 0.75rem; color: var(--text2); text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- PIN Ekranı -->
+<div id="pinScreen">
+  <div class="logo">🔔</div>
+  <h1>Okul Zil Sistemi<br>Uzaktan Kontrol</h1>
+  <p>PIN kodunuzu girin (4-8 hane)</p>
+
+  <div class="pin-display" id="pinDisplay">
+    <div class="pin-dot" id="pd0"></div>
+    <div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div>
+    <div class="pin-dot" id="pd3"></div>
+    <div class="pin-dot" id="pd4"></div>
+    <div class="pin-dot" id="pd5"></div>
+    <div class="pin-dot" id="pd6"></div>
+    <div class="pin-dot" id="pd7"></div>
+  </div>
+
+  <div class="numpad" id="numpad">
+    <button class="num-btn" data-n="1">1</button>
+    <button class="num-btn" data-n="2">2</button>
+    <button class="num-btn" data-n="3">3</button>
+    <button class="num-btn" data-n="4">4</button>
+    <button class="num-btn" data-n="5">5</button>
+    <button class="num-btn" data-n="6">6</button>
+    <button class="num-btn" data-n="7">7</button>
+    <button class="num-btn" data-n="8">8</button>
+    <button class="num-btn" data-n="9">9</button>
+    <button class="num-btn empty"></button>
+    <button class="num-btn" data-n="0">0</button>
+    <button class="num-btn del" id="delBtn">⌫</button>
+  </div>
+
+  <button id="pinLoginBtn" class="btn-big btn-primary-big" onclick="_doLogin()" disabled
+          style="width:100%;max-width:280px;margin-top:4px;">Giriş</button>
+  <div id="pinMsg"></div>
+  <p id="serverInfo" style="font-size:0.75rem;color:var(--text2);"></p>
+</div>
+
+<!-- Ana Ekran -->
+<div id="mainScreen">
+  <div class="rm-header">
+    <div class="title">🔔 Zil Kontrol</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span id="connLabel" style="font-size:0.75rem;color:var(--text2);">Bağlanıyor…</span>
+      <div id="connDot" class="rm-conn-dot"></div>
+    </div>
+  </div>
+
+  <!-- HTTP ile açıldıysa sertifika kurulum banner'ı -->
+  <div id="httpsBanner" style="display:none;background:#1e3a5f;border-bottom:2px solid #f59e0b;padding:12px 16px;font-size:0.8rem;">
+    <div style="color:#f59e0b;font-weight:700;margin-bottom:8px;">🔒 HTTPS Kurulumu — Mikrofon ve Güvenli Bağlantı İçin</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+
+      <!-- Adım 1 -->
+      <div style="background:#0f172a;border-radius:8px;padding:10px 12px;">
+        <div style="color:#fbbf24;font-weight:700;margin-bottom:4px;">Adım 1 — Sertifikayı İndirin</div>
+        <button id="bannerDlBtn" onclick="bannerDownloadCert()" style="width:100%;background:#2563eb;color:#fff;border:none;border-radius:7px;padding:9px;font-weight:700;font-size:0.82rem;cursor:pointer;">⬇ Sertifikayı İndir (zil_cert.crt)</button>
+        <div id="bannerDlMsg" style="color:#4ade80;font-size:0.73rem;min-height:14px;margin-top:4px;text-align:center;"></div>
+      </div>
+
+      <!-- Adım 2 -->
+      <div style="background:#0f172a;border-radius:8px;padding:10px 12px;">
+        <div style="color:#fbbf24;font-weight:700;margin-bottom:4px;">Adım 2 — Sertifikayı Yükleyin</div>
+        <div style="color:#94a3b8;font-size:0.75rem;">
+          <strong style="color:#e2e8f0;">Windows (Chrome/Edge):</strong> İndirilenler → zil_cert.crt'ye çift tıkla → Sertifikayı Yükle → <em>Yerel Makine</em> → İleri → <em style="color:#fbbf24;">Tüm sertifikaları aşağıdaki depolama alanına yerleştir</em> → Gözat → <em>Güvenilen Kök Sertifika Yetkilileri</em> → Tamam → İleri → Son<br><br>
+          <strong style="color:#ff9f43;">🦊 Firefox kullanıyorsanız</strong> — sertifikayı yükledikten sonra aşağıdaki butona da basın:<br>
+          <button id="ffBtn" onclick="bannerFixFirefox()" style="margin-top:6px;width:100%;background:#e65c00;color:#fff;border:none;border-radius:7px;padding:8px;font-weight:700;font-size:0.8rem;cursor:pointer;">🦊 Firefox için Kurulum Dosyası İndir (.bat)</button>
+          <div id="ffMsg" style="color:#4ade80;font-size:0.73rem;min-height:14px;margin-top:4px;text-align:center;"></div>
+          <div style="color:#64748b;font-size:0.72rem;margin-top:3px;">İndirilen .bat dosyasına çift tıklayın → Firefox'u kapatıp açın → HTTPS'e geçin.</div><br>
+          <strong style="color:#e2e8f0;">Android:</strong> İndirilenler → zil_cert.crt'ye dokun → "CA sertifikası" seç → onayla<br>
+          <strong style="color:#e2e8f0;">iPhone/iPad:</strong> zil_cert.crt'ye dokun → Ayarlar → Genel → VPN ve Aygıt Yönetimi → Profili Yükle → Güven ver
+        </div>
+      </div>
+
+      <!-- Adım 3 -->
+      <div style="background:#0f172a;border-radius:8px;padding:10px 12px;">
+        <div style="color:#fbbf24;font-weight:700;margin-bottom:4px;">Adım 3 — HTTPS ile Açın</div>
+        <div style="color:#94a3b8;font-size:0.73rem;margin-bottom:6px;">Sertifika yüklendikten sonra aşağıdaki adrese gidin:</div>
+        <div id="bannerHttpsLink" style="color:#f59e0b;font-weight:700;word-break:break-all;font-size:0.82rem;background:#1e293b;padding:6px 8px;border-radius:5px;">—</div>
+        <div style="display:flex;gap:8px;margin-top:7px;">
+          <button onclick="bannerCopyLink()" style="flex:1;background:#374151;color:#e2e8f0;border:none;border-radius:7px;padding:8px;font-weight:600;font-size:0.78rem;cursor:pointer;">📋 Kopyala</button>
+          <button onclick="bannerGoHttps()" style="flex:1;background:#16a34a;color:#fff;border:none;border-radius:7px;padding:8px;font-weight:700;font-size:0.78rem;cursor:pointer;">🔒 HTTPS'e Geç</button>
+        </div>
+        <div id="bannerCopyMsg" style="text-align:center;color:#4ade80;font-size:0.73rem;min-height:14px;margin-top:3px;"></div>
+      </div>
+
+      <div style="color:#64748b;font-size:0.7rem;text-align:center;">Bu işlemi bu cihazda yalnızca bir kez yapmanız yeterlidir.</div>
+      <button onclick="document.getElementById('httpsBanner').style.display='none'" style="background:none;border:1px solid #334155;border-radius:7px;color:#64748b;padding:6px;font-size:0.75rem;cursor:pointer;">✕ Şimdilik Kapat (HTTP ile devam et)</button>
+    </div>
+  </div>
+
+  <div class="rm-tabs">
+    <button class="rm-tab active" onclick="rmTab('bells',this)">🔔 Ziller</button>
+    <button class="rm-tab" onclick="rmTab('ceremonies',this)">🎵 Törenler</button>
+    <button class="rm-tab" onclick="rmTab('announce',this)">🎤 Anons</button>
+    <button class="rm-tab" onclick="rmTab('settings',this)">⚙️ PIN</button>
+  </div>
+
+  <div class="rm-content">
+
+    <!-- ZİLLER -->
+    <div class="rm-page active" id="page-bells">
+      <div class="section-title">Zil Çal</div>
+      <div class="bell-grid">
+        <div class="bell-card" onclick="remotePlayBell('student')">
+          <div class="icon">📚</div>
+          <div class="label">Öğrenci Zili</div>
+          <div class="sublabel">Ders başlangıcı</div>
+        </div>
+        <div class="bell-card" onclick="remotePlayBell('teacher')">
+          <div class="icon">👩‍🏫</div>
+          <div class="label">Öğretmen Zili</div>
+          <div class="sublabel">Öğretmen girişi</div>
+        </div>
+        <div class="bell-card" onclick="remotePlayBell('breakTime')">
+          <div class="icon">🏃</div>
+          <div class="label">Teneffüs Zili</div>
+          <div class="sublabel">Ara başlangıcı</div>
+        </div>
+      </div>
+      <button class="btn-stop-big" onclick="remoteStopAll()" style="margin-top:14px;">
+        ⏹ Tüm Sesleri Durdur
+      </button>
+      <div id="stopMsg" style="font-size:0.82rem;color:var(--text2);text-align:center;margin-top:6px;min-height:18px;"></div>
+    </div>
+
+    <!-- TÖRENLER -->
+    <div class="rm-page" id="page-ceremonies">
+      <div class="section-title">Tören Çal</div>
+      <div class="cer-list">
+        <div class="cer-card" onclick="remotePlayCeremony('anthemOnly')">
+          <div class="cer-label">🎵 İstiklal Marşı</div>
+          <div class="cer-play">▶</div>
+        </div>
+        <div class="cer-card" onclick="remotePlayCeremony('anthem1min')">
+          <div class="cer-label">🎖 1 Dk Saygı Duruşu + Marş</div>
+          <div class="cer-play">▶</div>
+        </div>
+        <div class="cer-card" onclick="remotePlayCeremony('silenceOnly')">
+          <div class="cer-label">🕯 1 Dakika Saygı Duruşu</div>
+          <div class="cer-play">▶</div>
+        </div>
+        <div class="cer-card emergency" onclick="remotePlayCeremony('emergency')" id="card-emergency">
+          <div class="cer-label" style="color:#ef4444;">🚨 Acil Durum / Tahliye</div>
+          <div class="cer-play" id="emergencyConfirm" style="font-size:0.7rem;color:#ef4444;display:none;text-align:right;line-height:1.4;">Emin misiniz?<br>
+            <span onclick="event.stopPropagation();_confirmEmergency()" style="background:#ef4444;color:#fff;padding:3px 8px;border-radius:5px;cursor:pointer;font-weight:700;">✓ Evet</span>
+            <span onclick="event.stopPropagation();_cancelEmergency()" style="background:var(--bg3);color:var(--text);padding:3px 8px;border-radius:5px;cursor:pointer;margin-left:4px;">✗ Hayır</span>
+          </div>
+          <div id="emergencyPlayIcon" class="cer-play">▶</div>
+        </div>
+      </div>
+      <button class="btn-stop-big" onclick="remoteStopAll()" style="margin-top:14px;">
+        ⏹ Tüm Sesleri Durdur
+      </button>
+      <div id="stopMsg2" style="font-size:0.82rem;color:var(--text2);text-align:center;margin-top:6px;min-height:18px;"></div>
+    </div>
+
+    <!-- ANONS -->
+    <div class="rm-page" id="page-announce">
+      <div class="section-title">Canlı Anons</div>
+      <div class="anons-zone">
+        <p style="font-size:0.82rem;color:var(--text2);text-align:center;">
+          Mikrofon düğmesine basın, konuşun, bırakın.<br>Ses okulun hoparlöründen çıkar.
+        </p>
+        <div id="httpsWarning" style="display:none;background:#1e3a5f;border:1px solid #f59e0b;border-radius:10px;padding:14px 16px;font-size:0.8rem;line-height:1.6;text-align:left;width:100%;box-sizing:border-box;">
+          <div style="color:#f59e0b;font-weight:700;text-align:center;margin-bottom:10px;font-size:0.9rem;">🔒 Mikrofon için Tek Seferlik Kurulum</div>
+
+          <!-- ADIM 1: Sertifika indir -->
+          <div style="background:#0f172a;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+            <div style="color:#fbbf24;font-weight:700;margin-bottom:4px;">Adım 1 — Sertifikayı İndirin</div>
+            <div style="color:#94a3b8;font-size:0.75rem;margin-bottom:8px;">Telefona güvenlik sertifikası yüklemek gerekir. Aşağıdaki butona basın:</div>
+            <button onclick="downloadCert()" style="width:100%;background:#2563eb;color:#fff;border:none;border-radius:7px;padding:9px;font-weight:700;font-size:0.82rem;cursor:pointer;">⬇ Sertifikayı İndir (zil_cert.crt)</button>
+            <div id="certDownloadMsg" style="color:#4ade80;font-size:0.73rem;min-height:14px;margin-top:4px;text-align:center;"></div>
+          </div>
+
+          <!-- ADIM 2: Sertifika yükle -->
+          <div style="background:#0f172a;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+            <div style="color:#fbbf24;font-weight:700;margin-bottom:4px;">Adım 2 — Sertifikayı Yükleyin</div>
+            <div style="color:#94a3b8;font-size:0.75rem;">
+              <strong style="color:#e2e8f0;">Android:</strong> İndirilenler → zil_cert.crt'ye dokun → "CA sertifikası" seç → onayla<br>
+              <strong style="color:#e2e8f0;">iPhone/iPad:</strong> İndirilenler → zil_cert.crt'ye dokun → Ayarlar → Genel → VPN ve Aygıt Yönetimi → Profili Yükle → Güven ver
+            </div>
+          </div>
+
+          <!-- ADIM 3: HTTPS ile aç -->
+          <div style="background:#0f172a;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+            <div style="color:#fbbf24;font-weight:700;margin-bottom:4px;">Adım 3 — HTTPS ile Açın</div>
+            <div style="color:#94a3b8;font-size:0.73rem;margin-bottom:6px;">Sertifika yüklendikten sonra adres çubuğuna şunu yazın:</div>
+            <div id="httpsLinkBox" style="color:#f59e0b;font-weight:700;word-break:break-all;font-size:0.82rem;background:#1e293b;padding:6px 8px;border-radius:5px;">—</div>
+            <button onclick="copyHttpsLink()" style="margin-top:7px;width:100%;background:#374151;color:#e2e8f0;border:none;border-radius:7px;padding:8px;font-weight:600;font-size:0.78rem;cursor:pointer;">📋 Adresi Kopyala</button>
+            <div id="httpsCopyMsg" style="text-align:center;color:#4ade80;font-size:0.73rem;min-height:14px;margin-top:3px;"></div>
+          </div>
+
+          <div style="color:#64748b;font-size:0.7rem;text-align:center;">Bu işlemi yalnızca bir kez yapmanız yeterlidir.</div>
+        </div>
+        <div id="recordBtn"
+             onpointerdown="_onRecordPointerDown(event)"
+             onpointerup="_onRecordPointerUp(event)"
+             onpointerleave="_onRecordPointerUp(event)"
+             ontouchstart="_onRecordTouchStart(event)"
+             ontouchend="_onRecordTouchEnd(event)"
+             ontouchcancel="_onRecordTouchEnd(event)"
+             oncontextmenu="return false">🎤</div>
+        <div id="recordTimer"></div>
+        <div id="recordLabel">Basılı tutun — bırakınca durur</div>
+        <button id="sendBtn" style="display:none" onclick="sendAnnounce()">📢 Okul Hoparlöründen Yayınla</button>
+        <div id="anonsMsg"></div>
+
+      </div>
+    </div>
+
+    <!-- AYARLAR / PIN -->
+    <div class="rm-page" id="page-settings">
+      <div class="section-title">PIN Değiştir</div>
+      <div style="display:flex;flex-direction:column;gap:14px;max-width:320px;margin:0 auto;">
+        <p style="font-size:0.82rem;color:var(--text2);">
+          Mevcut PIN'i ve yeni PIN'i girin. Değişiklik hem sunucuya hem telefona kaydedilir.
+        </p>
+        <input id="oldPinInput" type="text" inputmode="numeric" pattern="[0-9]*"
+               maxlength="12" placeholder="Mevcut PIN"
+               style="width:100%;padding:12px;border:1px solid var(--bg3);border-radius:var(--radius);background:var(--bg2);color:var(--text);font-size:1rem;letter-spacing:4px;">
+        <input id="newPinInput" type="text" inputmode="numeric" pattern="[0-9]*"
+               maxlength="12" placeholder="Yeni PIN (4-12 rakam)"
+               style="width:100%;padding:12px;border:1px solid var(--bg3);border-radius:var(--radius);background:var(--bg2);color:var(--text);font-size:1rem;letter-spacing:4px;">
+        <button class="btn-big btn-primary-big" onclick="changePin()">PIN Değiştir</button>
+        <div id="pinChangeMsg" style="font-size:0.85rem;text-align:center;min-height:20px;"></div>
+        <hr style="border:none;border-top:1px solid var(--bg3);margin:4px 0;">
+        <p style="font-size:0.8rem;color:var(--text2);">Bağlı hesap: <strong id="connectedAs">—</strong></p>
+        <button class="btn-big" style="background:var(--bg3);color:var(--text2);" onclick="doLogout()">Çıkış Yap</button>
+      </div>
+    </div>
+
+  </div><!-- rm-content -->
+
+  <div id="statusBar">Bağlantı bekleniyor…</div>
+</div><!-- mainScreen -->
+
+<script>
+// ── Köprü Sistemi ──────────────────────────────────────────────────────────
+// Render.com üzerindeki köprü sunucusu — telefon buraya bağlanır,
+// köprü komutu okul bilgisayarına iletir.
+const BRIDGE_URL   = 'https://okulzil-bridge.onrender.com';
+// ntfy topic: okul bilgisayarı başlarken kendi topic'ini ntfy.sh'e yayınlar.
+// connect.html bu topic'i okuyarak SERVER_BASE'i belirler.
+// Eğer localStorage'da kayıtlı topic varsa onu kullan, yoksa URL parametresinden al.
+function _getBridgeTopic() {
+  const urlP = new URLSearchParams(location.search).get('topic');
+  if (urlP) { localStorage.setItem('bridgeTopic', urlP); return urlP; }
+  return localStorage.getItem('bridgeTopic') || '';
+}
+const _bridgeTopic = _getBridgeTopic();
+// Tüm API çağrıları köprü üzerinden gider
+const SERVER_BASE  = _bridgeTopic ? `${BRIDGE_URL}/proxy/${_bridgeTopic}` : BRIDGE_URL;
+// ───────────────────────────────────────────────────────────────────────────
+// Service Worker kaydı — yalnızca HTTPS'de çalışır
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+// Mikrofon için HTTPS gerekli — eğer HTTP ile açıldıysa HTTPS portunu dene
+const _isHttps = location.protocol === 'https:';
+let _pin = '';
+
+// HTTPS adresini hesapla ve panoya kopyala
+function _getHttpsUrl() {
+  const httpsPort = parseInt(location.port || '80') + 1;
+  return `https://${location.hostname}:${httpsPort}${location.pathname}${location.search}`;
+}
+
+function redirectToHttps() {
+  window.location.href = _getHttpsUrl();
+}
+
+function copyHttpsLink() {
+  const url = _getHttpsUrl();
+  const msgEl = document.getElementById('httpsCopyMsg');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      if (msgEl) { msgEl.textContent = '✓ Kopyalandı!'; setTimeout(() => { if(msgEl) msgEl.textContent = ''; }, 3000); }
+    }).catch(() => {
+      if (msgEl) msgEl.textContent = 'Yukarıdaki adresi elle kopyalayın.';
+    });
+  } else {
+    if (msgEl) msgEl.textContent = 'Yukarıdaki adresi elle kopyalayın.';
+  }
+}
+
+function downloadCert() {
+  // HTTP port üzerinden sertifikayı indir (HTTPS bağlantısı henüz yok)
+  const httpPort = parseInt(location.port || '8765');
+  const certUrl = `http://${location.hostname}:${httpPort}/api/remote/install-cert`;
+  const msgEl = document.getElementById('certDownloadMsg');
+  try {
+    const a = document.createElement('a');
+    a.href = certUrl;
+    a.download = 'zil_cert.crt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    if (msgEl) { msgEl.textContent = '✓ İndirme başladı! Adım 2’ye geçin.'; }
+  } catch(e) {
+    if (msgEl) msgEl.textContent = 'İndirme başlatılamadı: ' + e.message;
+  }
+}
+
+// Anons sekmesi açıldığında HTTPS uyarısını göster/gizle
+function checkMicrophoneSupport() {
+  const warning = document.getElementById('httpsWarning');
+  const recordBtn = document.getElementById('recordBtn');
+  if (!warning || !recordBtn) return;
+  const micSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  // HTTPS link kutusunu doldur
+  const linkBox = document.getElementById('httpsLinkBox');
+  if (linkBox) linkBox.textContent = _getHttpsUrl();
+
+  if (_isHttps || micSupported) {
+    // Zaten HTTPS'deyiz veya mikrofon çalışıyor — uyarı gizle
+    warning.style.display = 'none';
+    recordBtn.style.opacity = '';
+    recordBtn.style.pointerEvents = '';
+    return;
+  }
+
+  // HTTP'deyiz ve mikrofon yok — sunucudan HTTPS portunu sorgula
+  warning.style.display = 'block';
+  recordBtn.style.opacity = '0.4';
+  recordBtn.style.pointerEvents = 'none';
+
+  // HTTPS sunucusu çalışıyor mu kontrol et
+  const httpPort = parseInt(location.port || '8765');
+  fetch(`http://${location.hostname}:${httpPort}/api/remote/local-ip`)
+    .then(r => r.json())
+    .then(data => {
+      const certMsgEl = document.getElementById('certDownloadMsg');
+      if (!data.https_port) {
+        // HTTPS sunucusu başlamadı — kullanıcıya bildir
+        if (certMsgEl) certMsgEl.textContent = '⚠ HTTPS sunucusu henüz hazır değil. Programı kapatıp tekrar açın.';
+        const dlBtn = warning.querySelector('button[onclick="downloadCert()"]');
+        if (dlBtn) { dlBtn.disabled = true; dlBtn.style.opacity = '0.5'; }
+      }
+    })
+    .catch(() => {});
+}
+let _mediaRecorder = null;
+let _recordedChunks = [];
+let _recordTimer = null;
+let _recordSeconds = 0;
+
+// ---- PIN & Giriş (numpad) ----
+let _pinEntry = '';
+const PIN_MIN = 4;
+const PIN_MAX = 8;
+
+function _updatePinDisplay() {
+  const len = _pinEntry.length;
+  // Nokta sayısını dinamik ayarla
+  const display = document.getElementById('pinDisplay');
+  // Mevcut noktaları güncelle (en fazla PIN_MAX nokta göster)
+  const dots = display.querySelectorAll('.pin-dot');
+  dots.forEach((dot, i) => dot.classList.toggle('filled', i < len));
+  // Giriş butonunu PIN_MIN'den itibaren etkinleştir
+  const loginBtn = document.getElementById('pinLoginBtn');
+  if (loginBtn) loginBtn.disabled = len < PIN_MIN;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('numpad').addEventListener('click', (e) => {
+    const btn = e.target.closest('.num-btn');
+    if (!btn) return;
+    if (btn.id === 'delBtn') {
+      _pinEntry = _pinEntry.slice(0, -1);
+      _updatePinDisplay();
+      document.getElementById('pinMsg').textContent = '';
+      return;
+    }
+    const n = btn.dataset.n;
+    if (n === undefined) return;
+    if (_pinEntry.length >= PIN_MAX) return;
+    _pinEntry += n;
+    _updatePinDisplay();
+  });
+  _updatePinDisplay();
+
+  // URL'deki ?pin= parametresini oku — QR kod ile otomatik giriş
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlPin = urlParams.get('pin');
+  if (urlPin && /^\d{4,12}$/.test(urlPin)) {
+    _pinEntry = urlPin;
+    _updatePinDisplay();
+    // Kısa gecikmeyle otomatik giriş yap (sayfa tam yüklensin)
+    setTimeout(() => _doLogin(), 400);
+  }
+});
+
+async function _doLogin() {
+  const pin = _pinEntry;
+  const msg = document.getElementById('pinMsg');
+  if (pin.length < PIN_MIN) { msg.textContent = 'En az ' + PIN_MIN + ' rakam girin.'; return; }
+  msg.textContent = 'Bağlanılıyor…';
+  const loginBtn = document.getElementById('pinLoginBtn');
+  if (loginBtn) loginBtn.disabled = true;
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch(`${SERVER_BASE}/api/remote/ping?pin=${encodeURIComponent(pin)}`, { signal: ctrl.signal });
+    clearTimeout(tid);
+    const d = await r.json();
+    if (d.ok) {
+      _pin = pin;
+      sessionStorage.setItem('remotePin', pin);
+      // URL'deki ?pin= parametresini tarayıcı geçmişinden temizle
+      if (window.location.search) history.replaceState(null, '', location.pathname);
+      document.getElementById('pinScreen').style.display = 'none';
+      document.getElementById('mainScreen').style.display = 'flex';
+      _initHttpsBanner(); // HTTP ile açıldıysa sertifika kurulum banner'ını göster
+      const ca = document.getElementById('connectedAs');
+      if (ca) ca.textContent = '****' + pin.slice(-2);
+      startSSEListener();
+      _syncStatus();
+    } else {
+      msg.textContent = d.error || 'Hatalı PIN.';
+      _pinEntry = '';
+      _updatePinDisplay();
+      if (loginBtn) loginBtn.disabled = true;
+    }
+  } catch(e) {
+    const isTimeout = e.name === 'AbortError';
+    msg.textContent = isTimeout
+      ? 'Zaman aşımı — sunucu cevap vermedi. Programın çalıştığını kontrol edin.'
+      : 'Bağlantı hatası: ' + e.message;
+    _pinEntry = '';
+    _updatePinDisplay();
+    if (loginBtn) loginBtn.disabled = true;
+  }
+}
+
+// ---- HTTPS Banner (HTTP ile açıldıysa ana ekranda göster) ----
+function _initHttpsBanner() {
+  if (location.protocol === 'https:') return; // Zaten HTTPS, banner gerekmez
+  const banner = document.getElementById('httpsBanner');
+  if (!banner) return;
+  // HTTPS linkini doldur
+  const httpsUrl = _getHttpsUrl();
+  const linkEl = document.getElementById('bannerHttpsLink');
+  if (linkEl) linkEl.textContent = httpsUrl;
+  banner.style.display = 'block';
+}
+
+function bannerDownloadCert() {
+  const httpPort = parseInt(location.port || '8765');
+  const certUrl  = `http://${location.hostname}:${httpPort}/api/remote/install-cert`;
+  const msgEl    = document.getElementById('bannerDlMsg');
+  try {
+    const a = document.createElement('a');
+    a.href = certUrl; a.download = 'zil_cert.crt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    if (msgEl) { msgEl.textContent = '✓ İndirme başladı! Adım 2\'ye geçin.'; }
+  } catch(e) {
+    if (msgEl) msgEl.textContent = 'İndirme başlatılamadı: ' + e.message;
+  }
+}
+
+function bannerCopyLink() {
+  const url   = _getHttpsUrl();
+  const msgEl = document.getElementById('bannerCopyMsg');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      if (msgEl) { msgEl.textContent = '✓ Kopyalandı!'; setTimeout(() => { if(msgEl) msgEl.textContent=''; }, 3000); }
+    }).catch(() => { if (msgEl) msgEl.textContent = 'Elle kopyalayın: ' + url; });
+  } else {
+    if (msgEl) msgEl.textContent = 'Elle kopyalayın: ' + url;
+  }
+}
+
+function bannerGoHttps() {
+  window.location.href = _getHttpsUrl();
+}
+
+async function bannerFixFirefox() {
+  const msgEl = document.getElementById('ffMsg');
+  const btn   = document.getElementById('ffBtn');
+  if (msgEl) msgEl.textContent = '⏳ İndiriliyor…';
+  if (btn)   btn.disabled = true;
+  try {
+    const httpPort = parseInt(location.port || '8765');
+    const url = `http://${location.hostname}:${httpPort}/api/remote/fix-firefox`;
+    const a = document.createElement('a');
+    a.href = url; a.download = 'firefox_sertifika_kur.bat';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    if (msgEl) msgEl.textContent = '✓ İndi! Dosyaya çift tıklayın, komut penceresi kapanınca Firefox\'u yeniden açın.';
+    if (btn)   btn.disabled = false;
+  } catch(e) {
+    if (msgEl) { msgEl.style.color='#ef4444'; msgEl.textContent = '✗ ' + e.message; }
+    if (btn)   btn.disabled = false;
+  }
+}
+
+// ---- Acil Durum onay mantığı ----
+let _emergencyPending = false;
+let _emergencyTimer = null;
+
+// Acil karta tıklanınca: önce onay göster
+const _origEmergencyCard = document.querySelector?.('.cer-card.emergency');
+document.addEventListener('DOMContentLoaded', () => {
+  const card = document.getElementById('card-emergency');
+  if (card) {
+    card.addEventListener('click', (e) => {
+      // Onay butonlarından gelen tıklamaları yakala
+      if (e.target.closest('[onclick*="_confirmEmergency"]') || e.target.closest('[onclick*="_cancelEmergency"]')) return;
+      if (_emergencyPending) { _cancelEmergency(); return; }
+      _emergencyPending = true;
+      document.getElementById('emergencyConfirm').style.display = 'block';
+      document.getElementById('emergencyPlayIcon').style.display = 'none';
+      // 5 saniye sonra otomatik iptal
+      _emergencyTimer = setTimeout(_cancelEmergency, 5000);
+    });
+  }
+});
+
+function _confirmEmergency() {
+  _cancelEmergency();
+  remotePlayCeremony('emergency');
+}
+
+function _cancelEmergency() {
+  _emergencyPending = false;
+  clearTimeout(_emergencyTimer);
+  const confirm = document.getElementById('emergencyConfirm');
+  const icon    = document.getElementById('emergencyPlayIcon');
+  if (confirm) confirm.style.display = 'none';
+  if (icon)    icon.style.display    = '';
+}
+
+// ---- SSE (opsiyonel: uzak istemci durum güncellemeleri için) ----
+function startSSEListener() {
+  const dot   = document.getElementById('connDot');
+  const label = document.getElementById('connLabel');
+  const bar   = document.getElementById('statusBar');
+
+  dot.className   = 'rm-conn-dot';
+  label.textContent = 'Bağlanıyor…';
+
+  const es = new EventSource(`${SERVER_BASE}/api/remote/sse?pin=${encodeURIComponent(_pin)}`);
+
+  es.addEventListener('connected', () => {
+    dot.className   = 'rm-conn-dot connected';
+    label.textContent = 'Bağlı';
+    bar.textContent  = '✓ Sunucuya bağlandı.';
+  });
+
+  es.addEventListener('play-ceremony', e => {
+    try {
+      const data = JSON.parse(e.data);
+      const key  = data.key;
+      _playingType = 'ceremony'; _playingKey = key;
+      _clearActiveCards();
+      _setCardActive(`.cer-card[onclick*="${key}"]`, true);
+    } catch(err) {}
+  });
+
+  es.addEventListener('play-bell', e => {
+    try {
+      _playingType = 'bell'; _playingKey = JSON.parse(e.data).type || null;
+      _clearActiveCards();
+    } catch(err) {}
+  });
+
+  es.addEventListener('stop-all', () => {
+    _playingType = null; _playingKey = null;
+    _clearActiveCards();
+  });
+
+  // _sseRetry fonksiyon içinde tanımlandı — önceki bağlantıdan kalan sayaç sıfırlanır
+  let _sseRetry = 0;
+
+  es.onerror = () => {
+    es.close();
+    _sseRetry++;
+    dot.className   = 'rm-conn-dot error';
+
+    if (_sseRetry <= 6) {
+      // İlk 30 sn: sessizce yeniden dene
+      label.textContent = `Bağlantı kesildi (${_sseRetry}/6)`;
+      bar.textContent   = `Yeniden bağlanıyor… (${_sseRetry}. deneme)`;
+      setTimeout(() => startSSEListener(), 5000);
+    } else {
+      // 6 denemeden sonra: otomatik IP taraması başlat
+      _autoDiscover();
+    }
+  };
+}
+
+// ---- Sekme değişimi ----
+function rmTab(id, btn) {
+  document.querySelectorAll('.rm-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.rm-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'announce') checkMicrophoneSupport();
+}
+
+// ---- API çağrıları ----
+async function _post(endpoint, body) {
+  const r = await fetch(`${SERVER_BASE}${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Remote-Pin': _pin },
+    body: JSON.stringify({ ...body, pin: _pin })
+  });
+  return r.json();
+}
+
+// Şu an çalan içeriği yerel olarak takip et (toggle için)
+let _playingType = null;  // 'bell' | 'ceremony' | null
+let _playingKey  = null;  // 'student' | 'anthemOnly' | ...
+
+// Sunucudan mevcut durumu çek ve _playing* değişkenlerini senkronize et
+async function _syncStatus() {
+  try {
+    const r = await fetch(`${SERVER_BASE}/api/remote/status?pin=${encodeURIComponent(_pin)}`,
+                          { headers: { 'X-Remote-Pin': _pin } });
+    const d = await r.json();
+    if (d.ok && d.playing) {
+      _playingType = d.playing.type || null;
+      _playingKey  = d.playing.key  || null;
+    }
+  } catch(e) {}
+}
+
+// Tüm kartların aktif görünümünü temizle
+function _clearActiveCards() {
+  document.querySelectorAll('.bell-card, .cer-card').forEach(c => c.classList.remove('playing'));
+}
+
+// Bir kartı aktif/pasif yap
+function _setCardActive(selector, active) {
+  const card = document.querySelector(selector);
+  if (card) card.classList.toggle('playing', active);
+}
+
+async function remotePlayBell(type) {
+  const bar = document.getElementById('statusBar');
+  // Toggle: aynı zil çalıyorsa durdur
+  if (_playingType === 'bell' && _playingKey === type) {
+    bar.textContent = '⏳ Durduruluyor…';
+    try {
+      const d = await _post('/api/remote/stop-all', {});
+      if (d.ok) {
+        _playingType = null; _playingKey = null;
+        _clearActiveCards();
+        bar.textContent = '⏹ Durduruldu.';
+      } else { bar.textContent = '✗ Hata: ' + d.error; }
+    } catch(e) { bar.textContent = '✗ ' + e.message; }
+    return;
+  }
+  bar.textContent = '⏳ Zil gönderiliyor…';
+  try {
+    const d = await _post('/api/remote/play-bell', { type });
+    if (d.ok) {
+      _playingType = 'bell'; _playingKey = type;
+      _clearActiveCards();
+      _setCardActive(`.bell-card[onclick*="${type}"]`, true);
+      bar.textContent = '✓ Zil çalıyor. Tekrar basarak durdurabilirsiniz.';
+    } else { bar.textContent = '✗ Hata: ' + d.error; }
+  } catch(e) { bar.textContent = '✗ ' + e.message; }
+}
+
+async function remotePlayCeremony(key) {
+  const bar = document.getElementById('statusBar');
+  // Toggle: aynı tören çalıyorsa durdur
+  if (_playingType === 'ceremony' && _playingKey === key) {
+    bar.textContent = '⏳ Durduruluyor…';
+    try {
+      const d = await _post('/api/remote/stop-all', {});
+      if (d.ok) {
+        _playingType = null; _playingKey = null;
+        _clearActiveCards();
+        bar.textContent = '⏹ Durduruldu.';
+      } else { bar.textContent = '✗ Hata: ' + d.error; }
+    } catch(e) { bar.textContent = '✗ ' + e.message; }
+    return;
+  }
+  bar.textContent = '⏳ Tören gönderiliyor…';
+  try {
+    const d = await _post('/api/remote/play-ceremony', { key });
+    if (d.ok) {
+      _playingType = 'ceremony'; _playingKey = key;
+      _clearActiveCards();
+      _setCardActive(`.cer-card[onclick*="${key}"]`, true);
+      bar.textContent = '✓ Tören başlatıldı. Tekrar basarak durdurabilirsiniz.';
+    } else { bar.textContent = '✗ Hata: ' + d.error; }
+  } catch(e) { bar.textContent = '✗ ' + e.message; }
+}
+
+async function remoteStopAll() {
+  const msg1 = document.getElementById('stopMsg');
+  const msg2 = document.getElementById('stopMsg2');
+  const _setMsg = (txt) => { if(msg1) msg1.textContent = txt; if(msg2) msg2.textContent = txt; };
+  _setMsg('⏳ Durduruluyor…');
+  try {
+    const d = await _post('/api/remote/stop-all', {});
+    if (d.ok) {
+      _playingType = null; _playingKey = null;
+      _clearActiveCards();
+      _setMsg('✓ Tüm sesler durduruldu.');
+      setTimeout(() => _setMsg(''), 3000);
+    } else { _setMsg('✗ Hata: ' + d.error); }
+  } catch(e) { _setMsg('✗ ' + e.message); }
+}
+
+async function changePin() {
+  const oldPin = document.getElementById('oldPinInput').value.trim();
+  const newPin = document.getElementById('newPinInput').value.trim();
+  const msg    = document.getElementById('pinChangeMsg');
+  if (!oldPin || !newPin) { msg.style.color='#ef4444'; msg.textContent='Her iki alanı doldurun.'; return; }
+  if (!/^\d{4,12}$/.test(newPin)) { msg.style.color='#ef4444'; msg.textContent='Yeni PIN 4-12 rakam olmalı.'; return; }
+  if (oldPin !== _pin) { msg.style.color='#ef4444'; msg.textContent='Mevcut PIN hatalı.'; return; }
+  msg.style.color='var(--text2)'; msg.textContent='⏳ Değiştiriliyor…';
+  try {
+    const r = await fetch(`${SERVER_BASE}/api/remote/set-pin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Remote-Pin': oldPin },
+      body: JSON.stringify({ pin: oldPin, newPin })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      _pin = newPin;
+      sessionStorage.setItem('remotePin', newPin);
+      document.getElementById('connectedAs').textContent = '****' + newPin.slice(-2);
+      msg.style.color = '#22c55e';
+      msg.textContent = '✓ PIN değiştirildi!';
+      document.getElementById('oldPinInput').value = '';
+      document.getElementById('newPinInput').value = '';
+    } else {
+      msg.style.color='#ef4444'; msg.textContent='Hata: ' + (d.error||'Bilinmeyen');
+    }
+  } catch(e) { msg.style.color='#ef4444'; msg.textContent='✗ ' + e.message; }
+}
+
+function doLogout() {
+  sessionStorage.removeItem('remotePin');
+  _pin = '';
+  document.getElementById('mainScreen').style.display = 'none';
+  document.getElementById('pinScreen').style.display  = 'flex';
+  _pinEntry = ''; _updatePinDisplay();
+  document.getElementById('pinMsg').textContent = '';
+}
+
+// ---- Kayıt (WAV chunk streaming — ScriptProcessor + HTTP) ----
+let _stream       = null;
+let _audioCtx     = null;
+let _processor    = null;
+let _streaming    = false;
+let _isConnecting = false;
+let _accumBuf     = [];
+let _sendTimer    = null;
+
+function _cleanupStream() {
+  _isConnecting = false;
+  clearInterval(_sendTimer); _sendTimer = null;
+  if (_processor) { try { _processor.disconnect(); } catch {} _processor = null; }
+  if (_audioCtx)  { try { _audioCtx.close();       } catch {} _audioCtx  = null; }
+  if (_stream)    { _stream.getTracks().forEach(t => t.stop()); _stream = null; }
+  _accumBuf = [];
+  const btn = document.getElementById('recordBtn');
+  const lbl = document.getElementById('recordLabel');
+  if (btn) { btn.classList.remove('recording'); btn.textContent = '🎤'; }
+  if (lbl) lbl.textContent = 'Basılı tutun — bırakınca durur';
+}
+
+function _makeWav(pcmBuffer, sampleRate, numChannels) {
+  const dataLen = pcmBuffer.byteLength;
+  const buf  = new ArrayBuffer(44 + dataLen);
+  const view = new DataView(buf);
+  view.setUint32(0,  0x52494646, false); // "RIFF"
+  view.setUint32(4,  36 + dataLen, true);
+  view.setUint32(8,  0x57415645, false); // "WAVE"
+  view.setUint32(12, 0x666d7420, false); // "fmt "
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);           // PCM
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numChannels * 2, true);
+  view.setUint16(32, numChannels * 2, true);
+  view.setUint16(34, 16, true);
+  view.setUint32(36, 0x64617461, false); // "data"
+  view.setUint32(40, dataLen, true);
+  new Uint8Array(buf, 44).set(new Uint8Array(pcmBuffer));
+  return buf;
+}
+
+function _f32ToWavB64(floatArrays, sampleRate) {
+  const totalLen = floatArrays.reduce((s, a) => s + a.length, 0);
+  const s16 = new Int16Array(totalLen);
+  let off = 0;
+  for (const arr of floatArrays) {
+    for (let i = 0; i < arr.length; i++) {
+      let v = arr[i];
+      // Yumuşak kırpıcı — DERS-010
+      if (v > 0.85)       v = 0.85 + (v - 0.85) / 10;
+      else if (v < -0.85) v = -0.85 + (v + 0.85) / 10;
+      s16[off++] = v < 0 ? v * 0x8000 : v * 0x7FFF;
+    }
+  }
+  const wavBuf = _makeWav(s16.buffer, sampleRate, 1);
+  const bytes  = new Uint8Array(wavBuf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+async function _startStream() {
+  if (_streaming || _isConnecting) return;
+  _isConnecting = true;
+  const msg = document.getElementById('anonsMsg');
+  const btn = document.getElementById('recordBtn');
+  const lbl = document.getElementById('recordLabel');
+
+  // Mikrofon — tarayıcı varsayılanları (DERS-010: kapatmak bazı telefonlarda track'i öldürüyor)
+  try {
+    _stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch(e) {
+    _isConnecting = false;
+    const isSecure = location.protocol === 'https:' || location.hostname === 'localhost';
+    if (!isSecure) {
+      msg.innerHTML = `<span style="color:#ef4444;font-weight:600;">⚠ Mikrofon çalışmıyor</span><br>
+        <span style="font-size:0.8rem;">HTTPS gerekli. Adres çubuğuna yazın: https://${location.hostname}:${parseInt(location.port||'8765')+1}${location.pathname}</span>`;
+    } else if (e.name === 'NotAllowedError') {
+      msg.innerHTML = `<span style="color:#ef4444;font-weight:600;">⚠ Mikrofon izni reddedildi</span><br>
+        <span style="font-size:0.8rem;">Adres çubuğu → 🔒 → Site ayarları → Mikrofon → İzin ver</span>`;
+    } else {
+      msg.textContent = 'Mikrofon hatası: ' + e.message;
+    }
+    return;
+  }
+  const firstTrack = _stream.getAudioTracks()[0];
+  if (!firstTrack || firstTrack.readyState !== 'live') {
+    _isConnecting = false;
+    _stream.getTracks().forEach(t => t.stop()); _stream = null;
+    msg.textContent = '✗ Mikrofon başlatılamadı — tekrar deneyin';
+    return;
+  }
+
+  // Sunucuya stream başlat
+  msg.textContent = '⏳ Bağlanıyor…';
+  try {
+    await _post('/api/remote/stream-start', { mime: 'audio/wav' });
+  } catch(e) {
+    _isConnecting = false;
+    _cleanupStream();
+    msg.textContent = '✗ Sunucu bağlantısı kurulamadı: ' + e.message;
+    return;
+  }
+
+  // Web Audio API — ScriptProcessor ile PCM yakala
+  _audioCtx  = new (window.AudioContext || window.webkitAudioContext)();
+  await _audioCtx.resume();  // iOS/Android: context askıya alınmış başlayabilir
+  const src  = _audioCtx.createMediaStreamSource(_stream);
+  _processor = _audioCtx.createScriptProcessor(4096, 1, 1);
+  const rate = _audioCtx.sampleRate;
+
+  _processor.onaudioprocess = function(ev) {
+    if (!_streaming) return;
+    _accumBuf.push(new Float32Array(ev.inputBuffer.getChannelData(0)));
+  };
+  src.connect(_processor);
+  _processor.connect(_audioCtx.destination);
+
+  // Her 250ms'de bir WAV chunk gönder
+  _sendTimer = setInterval(async () => {
+    if (!_streaming || _accumBuf.length === 0) return;
+    const chunks = _accumBuf.splice(0);
+    try { await _post('/api/remote/stream-chunk', { chunk: _f32ToWavB64(chunks, rate) }); } catch {}
+  }, 250);
+
+  _streaming    = true;
+  _isConnecting = false;
+  btn.classList.add('recording');
+  btn.textContent = '🔴';
+  lbl.textContent = 'Canlı yayın… Bırakın durdurmak için';
+  msg.textContent = '';
+}
+
+async function _stopStream() {
+  if (!_streaming) return;
+  _streaming = false;
+  clearInterval(_sendTimer); _sendTimer = null;
+  // Kalan son chunk'ı gönder
+  if (_accumBuf.length > 0 && _audioCtx) {
+    const chunks = _accumBuf.splice(0);
+    try { await _post('/api/remote/stream-chunk', { chunk: _f32ToWavB64(chunks, _audioCtx.sampleRate) }); } catch {}
+  }
+  try { await _post('/api/remote/stream-end', {}); } catch {}
+  _cleanupStream();
+  const msg = document.getElementById('anonsMsg');
+  if (msg) msg.textContent = '';
+}
+
+function toggleRecord() {}
+async function sendAnnounce() {}
+
+let _touchActive = false;
+
+function _onRecordPointerDown(e) {
+  if (_touchActive) return; // iOS'ta çift tetiklenmeyi önle
+  e.preventDefault();
+  _startStream();
+}
+function _onRecordPointerUp(e) {
+  if (_touchActive) return;
+  e.preventDefault();
+  _stopStream();
+}
+
+// iOS Safari için touch olayları (pointer events iOS'ta güvenilmez)
+function _onRecordTouchStart(e) {
+  _touchActive = true;
+  e.preventDefault();
+  _startStream();
+}
+function _onRecordTouchEnd(e) {
+  e.preventDefault();
+  _stopStream();
+  setTimeout(() => { _touchActive = false; }, 300);
+}
+
+// ---- Otomatik IP Bulucu ----
+async function _getLocalSubnet() {
+  return new Promise(resolve => {
+    try {
+      const pc = new RTCPeerConnection({ iceServers: [] });
+      pc.createDataChannel('');
+      pc.createOffer().then(o => pc.setLocalDescription(o));
+      pc.onicecandidate = ev => {
+        if (!ev || !ev.candidate) return;
+        const m = ev.candidate.candidate.match(/(\d+\.\d+\.\d+)\.\d+/);
+        if (m) { pc.close(); resolve(m[1]); }
+      };
+      setTimeout(() => { pc.close(); resolve(null); }, 3000);
+    } catch (e) { resolve(null); }
+  });
+}
+
+async function _scanSubnet(subnet, httpPort, updateBar) {
+  const BATCH = 20;
+  const TIMEOUT_MS = 500;
+  for (let start = 1; start <= 254; start += BATCH) {
+    const promises = [];
+    for (let i = start; i < start + BATCH && i <= 254; i++) {
+      const ip = `${subnet}.${i}`;
+      promises.push((async () => {
+        try {
+          const ctrl = new AbortController();
+          const tid = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+          const r = await fetch(`http://${ip}:${httpPort}/api/remote/discover`, { signal: ctrl.signal });
+          clearTimeout(tid);
+          if (r.ok) { const d = await r.json(); if (d.app === 'NeneOkulZil') return ip; }
+        } catch (e) {}
+        return null;
+      })());
+    }
+    const results = await Promise.all(promises);
+    const found = results.find(r => r !== null);
+    if (found) return found;
+    updateBar(`${subnet}.x taranıyor… (${Math.min(start + BATCH - 1, 254)}/254)`);
+  }
+  return null;
+}
+
+async function _autoDiscover() {
+  const dot   = document.getElementById('connDot');
+  const label = document.getElementById('connLabel');
+  const bar   = document.getElementById('statusBar');
+  const httpPort = parseInt(location.port || '8766') - 1; // 8766→8765
+
+  dot.className   = 'rm-conn-dot';
+  label.textContent = 'Sunucu aranıyor…';
+  bar.innerHTML   = '<span style="color:var(--accent-color, #f59e0b);">🔍 Ağda sunucu aranıyor…</span>';
+
+  const subnets = [];
+  const rtcSubnet = await _getLocalSubnet();
+  if (rtcSubnet) subnets.push(rtcSubnet);
+  for (const s of ['192.168.1', '192.168.0', '10.0.0', '10.1.1']) {
+    if (s !== rtcSubnet) subnets.push(s);
+  }
+
+  for (const subnet of subnets) {
+    const found = await _scanSubnet(subnet, httpPort, msg => {
+      bar.innerHTML = `<span style="color:var(--accent-color, #f59e0b);">🔍 ${msg}</span>`;
+    });
+    if (found) {
+      bar.innerHTML = `<span style="color:var(--success-color, #22c55e);">✓ Sunucu bulundu: ${found} — bağlanılıyor…</span>`;
+      setTimeout(() => {
+        window.location.href = `http://${found}:${httpPort}/remote.html`;
+      }, 800);
+      return;
+    }
+  }
+
+  label.textContent = 'Sunucu bulunamadı';
+  bar.innerHTML = `
+    <span style="color:#ef4444;">⚠ Sunucuya ulaşılamıyor.</span><br>
+    <span style="font-size:0.8rem;">Okul bilgisayarının açık ve ağa bağlı olduğundan emin olun.</span><br>
+    <button onclick="_autoDiscover()"
+      style="margin-top:8px;padding:6px 18px;border:none;border-radius:8px;
+             background:var(--accent-color,#f59e0b);color:#000;font-weight:600;cursor:pointer;">
+      Tekrar Ara
+    </button>`;
+}
+</script>
+</body>
+</html>
