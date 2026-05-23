@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Okul Zil — Bağlanıyor…</title>
+<style>
+  body{min-height:100vh;display:flex;align-items:center;justify-content:center;
+       background:#0f172a;font-family:sans-serif;color:#f1f5f9;text-align:center}
+  .box{padding:40px}
+  .icon{font-size:3rem;margin-bottom:16px}
+  p{color:#94a3b8;margin-top:8px;font-size:0.9rem}
+  .err{color:#f87171}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="icon">🔔</div>
+  <div id="msg">Sunucuya bağlanılıyor…</div>
+  <p id="sub"></p>
+</div>
+<script>
+const TOPIC = 'nene-okul-zil-k7m2p9xw';
+
+async function connect() {
+  try {
+    const res = await fetch('https://ntfy.sh/' + TOPIC + '/json?poll=1&since=12h');
+    const text = await res.text();
+    const lines = text.trim().split('\n').filter(Boolean);
+    if (!lines.length) {
+      document.getElementById('msg').className = 'err';
+      document.getElementById('msg').textContent = '❌ Sunucu bulunamadı';
+      document.getElementById('sub').textContent = 'Bilgisayarın açık ve programın çalışıyor olduğundan emin ol.';
+      return;
+    }
+    const last = JSON.parse(lines[lines.length - 1]);
+    const ip = last.message.trim();
+    document.getElementById('sub').textContent = ip + ' adresine yönlendiriliyorsunuz…';
+    window.location.href = 'http://' + ip + ':8765/remote.html';
+  } catch(e) {
+    document.getElementById('msg').className = 'err';
+    document.getElementById('msg').textContent = '❌ Bağlantı hatası';
+    document.getElementById('sub').textContent = e.message;
+  }
+}
+
+connect();
+</script>
+</body>
+</html>
