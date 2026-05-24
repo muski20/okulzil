@@ -1178,7 +1178,7 @@ async function _autoDiscover() {
     if (found) {
       bar.innerHTML = `<span style="color:var(--success-color, #22c55e);">✓ Sunucu bulundu: ${found} — bağlanılıyor…</span>`;
       setTimeout(() => {
-        window.location.href = `http://${found}:${httpPort}/remote.html`;
+        window.location.href = `http://${found}:${httpPort}/remote.html?v=${Date.now()}`;
       }, 800);
       return;
     }

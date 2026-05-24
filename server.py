@@ -2058,6 +2058,22 @@ class ZilHandler(http.server.SimpleHTTPRequestHandler):
         else:
             # Statik dosyalar için path'ten token'ı temizle
             self.path = p
+            # remote.html ve sw.js her zaman taze gelsin — tarayıcı cache'i engelle
+            if p in ('/remote.html', '/sw.js'):
+                _fpath = os.path.join(SCRIPT_DIR, p.lstrip('/'))
+                if os.path.exists(_fpath):
+                    with open(_fpath, 'rb') as _fh:
+                        _fc = _fh.read()
+                    _ct = 'text/html; charset=utf-8' if p.endswith('.html') else 'application/javascript'
+                    self.send_response(200)
+                    self.send_header('Content-Type', _ct)
+                    self.send_header('Content-Length', str(len(_fc)))
+                    self.send_header('Cache-Control', 'no-store, must-revalidate')
+                    self.send_header('Pragma', 'no-cache')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(_fc)
+                    return
             super().do_GET()
 
     def do_POST(self):
