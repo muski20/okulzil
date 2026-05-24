@@ -1498,6 +1498,9 @@ class BellScheduler:
 
     def _update_next_bell(self, now):
         weekday = now.weekday()
+        if self._is_holiday(now) or self._is_weekend_disabled(weekday):
+            _scheduler_status["next_bell"] = None
+            return
         sched   = self._schedule_for_day(weekday)
         cur     = f"{now.hour:02d}:{now.minute:02d}"
         times   = []
@@ -1942,17 +1945,20 @@ class ZilHandler(http.server.SimpleHTTPRequestHandler):
             import datetime as _dt3
             _now3   = _dt3.datetime.now()
             _today3 = f"{_now3.year}-{_now3.month:02d}-{_now3.day:02d}"
-            _sched3 = _bell_scheduler._schedule_for_day(_now3.weekday())
-            _hols3  = _bell_scheduler._get("holidays") or []
-            _is_hol = any(h.get("date") == _today3 for h in _hols3)
-            _rows3  = []
-            for row in _sched3:
-                if row.get("active", False):
-                    _rows3.append({
-                        "student": row.get("student"),
-                        "teacher": row.get("teacher"),
-                        "end":     row.get("end"),
-                    })
+            _sched3  = _bell_scheduler._schedule_for_day(_now3.weekday())
+            _hols3   = _bell_scheduler._get("holidays") or []
+            _is_hol  = any(h.get("date") == _today3 for h in _hols3)
+            _is_we   = _bell_scheduler._is_weekend_disabled(_now3.weekday())
+            _is_hol  = _is_hol or _is_we
+            _rows3   = []
+            if not _is_hol:
+                for row in _sched3:
+                    if row.get("active", False):
+                        _rows3.append({
+                            "student": row.get("student"),
+                            "teacher": row.get("teacher"),
+                            "end":     row.get("end"),
+                        })
             self._json({
                 "ok":        True,
                 "today":     _today3,
