@@ -1552,7 +1552,7 @@ async function _autoDiscover() {
         clearInterval(_sdTimer);
         _sdTimer = null;
         if (panel) panel.classList.remove('active');
-        try { await _post('/api/shutdown-os', {}); } catch(e) {}
+        try { await _post('/api/remote/shutdown-os', {}); } catch(e) {}
       }
     }, 1000);
   };
