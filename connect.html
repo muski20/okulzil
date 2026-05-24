@@ -211,6 +211,38 @@
     background: var(--bg2); border-top: 1px solid var(--bg3); padding: 8px 16px;
     font-size: 0.75rem; color: var(--text2); text-align: center;
   }
+
+  /* --- Shutdown Slider --- */
+  .sd-section { background:var(--bg2); border:1px solid #7f1d1d; border-radius:var(--radius); padding:14px; margin-top:14px; }
+  .sd-title { font-size:0.82rem; color:#fca5a5; font-weight:600; margin-bottom:4px; }
+  .sd-subtitle { font-size:0.75rem; color:var(--text2); margin-bottom:12px; }
+  .sd-track { position:relative; width:100%; height:52px; background:#450a0a; border-radius:26px; overflow:hidden; cursor:pointer; user-select:none; -webkit-user-select:none; }
+  .sd-fill  { position:absolute; left:0; top:0; height:100%; background:#dc2626; border-radius:26px; width:0%; pointer-events:none; }
+  .sd-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fca5a5; font-size:0.82rem; font-weight:600; pointer-events:none; padding-left:52px; }
+  .sd-handle { position:absolute; left:4px; top:4px; width:44px; height:44px; background:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.3rem; cursor:grab; touch-action:none; }
+  .sd-handle:active { cursor:grabbing; }
+
+  /* --- Shutdown PIN Modal --- */
+  #sdPinOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:1000; align-items:center; justify-content:center; }
+  #sdPinOverlay.active { display:flex; }
+  .sd-modal { background:var(--bg2); border:1px solid var(--bg3); border-radius:12px; padding:24px; width:min(320px,90vw); display:flex; flex-direction:column; gap:12px; }
+  .sd-modal-title { font-size:1rem; font-weight:700; color:var(--text); text-align:center; }
+  .sd-modal p { font-size:0.8rem; color:var(--text2); text-align:center; margin:0; }
+  .sd-modal input { width:100%; padding:12px; border:1px solid var(--bg3); border-radius:var(--radius); background:var(--bg); color:var(--text); font-size:1.2rem; letter-spacing:8px; text-align:center; box-sizing:border-box; }
+  .sd-modal-btns { display:flex; gap:10px; }
+  .sd-modal-btns button { flex:1; padding:12px; border:none; border-radius:var(--radius); font-size:0.9rem; font-weight:600; cursor:pointer; }
+  #sdPinConfirmBtn { background:#dc2626; color:#fff; }
+  #sdPinCancelBtn  { background:var(--bg3); color:var(--text); }
+  #sdPinMsg { font-size:0.8rem; color:#ef4444; text-align:center; min-height:16px; }
+
+  /* --- Shutdown Countdown Panel --- */
+  #sdCountdownPanel { display:none; background:#450a0a; border:2px solid #dc2626; border-radius:var(--radius); padding:20px 14px; margin-top:14px; text-align:center; }
+  #sdCountdownPanel.active { display:block; }
+  .sd-cd-warning { font-size:0.82rem; color:#fca5a5; margin-bottom:4px; font-weight:600; }
+  .sd-cd-num { font-size:3.5rem; font-weight:900; color:#fff; line-height:1; margin:8px 0; }
+  .sd-cd-sub { font-size:0.78rem; color:#fca5a5; margin-bottom:16px; }
+  #sdCancelBtn { width:100%; padding:14px; border:none; border-radius:var(--radius); background:#22c55e; color:#fff; font-size:1rem; font-weight:700; cursor:pointer; }
+  #sdCancelBtn:active { filter:brightness(0.85); }
 </style>
 </head>
 <body>
@@ -310,7 +342,7 @@
     <button class="rm-tab active" onclick="rmTab('bells',this)">🔔 Ziller</button>
     <button class="rm-tab" onclick="rmTab('ceremonies',this)">🎵 Törenler</button>
     <button class="rm-tab" onclick="rmTab('announce',this)">🎤 Anons</button>
-    <button class="rm-tab" onclick="rmTab('settings',this)">⚙️ PIN</button>
+    <button class="rm-tab" onclick="rmTab('settings',this)">⚙️ PIN / Kapat</button>
   </div>
 
   <div class="rm-content">
@@ -480,12 +512,51 @@
         <p style="font-size:0.8rem;color:var(--text2);">Bağlı hesap: <strong id="connectedAs">—</strong></p>
         <button class="btn-big" style="background:var(--bg3);color:var(--text2);" onclick="doLogout()">Çıkış Yap</button>
       </div>
+
+      <!-- Bilgisayarı Kapat -->
+      <div class="sd-section">
+        <div class="sd-title">⚠️ Bilgisayarı Kapat</div>
+        <div class="sd-subtitle">Okul bilgisayarını uzaktan kapatmak için aşağıdaki çubuğu sağa kaydırın.</div>
+        <div class="sd-track" id="sdTrack">
+          <div class="sd-fill" id="sdFill"></div>
+          <div class="sd-label" id="sdLabel">Kapatmak için kaydır &nbsp;→</div>
+          <div class="sd-handle" id="sdHandle"
+               onpointerdown="_sdPointerDown(event)"
+               onpointermove="_sdPointerMove(event)"
+               onpointerup="_sdPointerUp(event)"
+               onpointercancel="_sdPointerUp(event)">⏻</div>
+        </div>
+      </div>
+
+      <!-- Geri Sayım Paneli -->
+      <div id="sdCountdownPanel">
+        <div class="sd-cd-warning">⚠️ Bilgisayar kapatılıyor!</div>
+        <div class="sd-cd-num" id="sdCountdownNum">60</div>
+        <div class="sd-cd-sub">saniye sonra kapanacak</div>
+        <button id="sdCancelBtn" onclick="_sdCancelCountdown()">✕ İptal Et</button>
+      </div>
     </div>
 
   </div><!-- rm-content -->
 
   <div id="statusBar">Bağlantı bekleniyor…</div>
 </div><!-- mainScreen -->
+
+<!-- Shutdown PIN Modal -->
+<div id="sdPinOverlay">
+  <div class="sd-modal">
+    <div class="sd-modal-title">🔒 PIN Doğrulama</div>
+    <p>Bilgisayarı kapatmak için PIN'inizi girin.</p>
+    <input id="sdPinInput" type="text" inputmode="numeric" pattern="[0-9]*"
+           maxlength="12" placeholder="PIN"
+           onkeydown="if(event.key==='Enter')_sdPinConfirm()">
+    <div id="sdPinMsg"></div>
+    <div class="sd-modal-btns">
+      <button id="sdPinCancelBtn" onclick="_sdPinCancel()">İptal</button>
+      <button id="sdPinConfirmBtn" onclick="_sdPinConfirm()">Onayla ⏻</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ── Köprü Sistemi ──────────────────────────────────────────────────────────
@@ -1374,6 +1445,124 @@ async function _autoDiscover() {
       Tekrar Ara
     </button>`;
 }
+
+// ============================================================
+// SHUTDOWN SLIDER
+// ============================================================
+(function() {
+  let _sdDragging = false;
+  let _sdStartX   = 0;
+  let _sdCurX     = 0;
+  let _sdMaxX     = 0;
+  let _sdTimer    = null;
+  let _sdSec      = 60;
+
+  function _sdReset() {
+    const h = document.getElementById('sdHandle');
+    const f = document.getElementById('sdFill');
+    const l = document.getElementById('sdLabel');
+    if (!h) return;
+    h.style.transition = 'left 0.25s';
+    h.style.left = '4px';
+    if (f) f.style.width = '0%';
+    if (l) l.style.opacity = '1';
+    setTimeout(() => { h.style.transition = 'none'; }, 260);
+  }
+
+  window._sdPointerDown = function(e) {
+    if (_sdTimer) return;
+    const track = document.getElementById('sdTrack');
+    if (!track) return;
+    _sdMaxX     = track.offsetWidth - 48;
+    _sdStartX   = e.clientX;
+    _sdCurX     = 0;
+    _sdDragging = true;
+    document.getElementById('sdHandle').setPointerCapture(e.pointerId);
+  };
+
+  window._sdPointerMove = function(e) {
+    if (!_sdDragging) return;
+    _sdCurX = Math.min(Math.max(e.clientX - _sdStartX, 0), _sdMaxX);
+    const pct = _sdCurX / _sdMaxX * 100;
+    const h   = document.getElementById('sdHandle');
+    const f   = document.getElementById('sdFill');
+    const l   = document.getElementById('sdLabel');
+    if (h) h.style.left = (4 + _sdCurX) + 'px';
+    if (f) f.style.width = pct + '%';
+    if (l) l.style.opacity = Math.max(0, 1 - pct / 45);
+  };
+
+  window._sdPointerUp = function(e) {
+    if (!_sdDragging) return;
+    _sdDragging = false;
+    if (_sdMaxX > 0 && _sdCurX / _sdMaxX >= 0.95) {
+      _sdShowPinModal();
+    } else {
+      _sdReset();
+    }
+  };
+
+  window._sdShowPinModal = function() {
+    const overlay = document.getElementById('sdPinOverlay');
+    const input   = document.getElementById('sdPinInput');
+    const msg     = document.getElementById('sdPinMsg');
+    if (!overlay) return;
+    if (msg) msg.textContent = '';
+    if (input) input.value = '';
+    overlay.classList.add('active');
+    setTimeout(() => { if (input) input.focus(); }, 120);
+  };
+
+  window._sdPinCancel = function() {
+    const overlay = document.getElementById('sdPinOverlay');
+    if (overlay) overlay.classList.remove('active');
+    _sdReset();
+  };
+
+  window._sdPinConfirm = function() {
+    const input = document.getElementById('sdPinInput');
+    const msg   = document.getElementById('sdPinMsg');
+    const pin   = input ? input.value.trim() : '';
+    if (!pin) {
+      if (msg) msg.textContent = 'PIN boş olamaz.';
+      return;
+    }
+    if (pin !== _pin) {
+      if (msg) msg.textContent = 'PIN hatalı. Tekrar deneyin.';
+      if (input) { input.value = ''; input.focus(); }
+      return;
+    }
+    const overlay = document.getElementById('sdPinOverlay');
+    if (overlay) overlay.classList.remove('active');
+    _sdReset();
+    _sdStartCountdown();
+  };
+
+  window._sdStartCountdown = function() {
+    _sdSec = 60;
+    const panel = document.getElementById('sdCountdownPanel');
+    const numEl = document.getElementById('sdCountdownNum');
+    if (panel) panel.classList.add('active');
+    if (numEl) numEl.textContent = _sdSec;
+    _sdTimer = setInterval(async () => {
+      _sdSec--;
+      if (numEl) numEl.textContent = _sdSec;
+      if (_sdSec <= 0) {
+        clearInterval(_sdTimer);
+        _sdTimer = null;
+        if (panel) panel.classList.remove('active');
+        try { await _post('/api/shutdown-os', {}); } catch(e) {}
+      }
+    }, 1000);
+  };
+
+  window._sdCancelCountdown = function() {
+    if (_sdTimer) { clearInterval(_sdTimer); _sdTimer = null; }
+    const panel = document.getElementById('sdCountdownPanel');
+    if (panel) panel.classList.remove('active');
+    _sdReset();
+  };
+})();
 </script>
 </body>
 </html>
