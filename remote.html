@@ -178,6 +178,34 @@
   .section-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
     letter-spacing: 1px; color: var(--text2); margin-bottom: 10px; }
 
+  /* Sonraki Zil Kartı + Bugünün Programı */
+  #nextBellCard {
+    background: var(--bg2); border: 1px solid var(--bg3); border-radius: var(--radius);
+    padding: 12px 16px; margin-bottom: 10px; display: flex; align-items: center;
+    justify-content: space-between; gap: 10px;
+  }
+  #nextBellCard.holiday { background: #1e3a2f; border-color: #16a34a; }
+  .nbc-left { display: flex; flex-direction: column; gap: 2px; }
+  .nbc-label { font-size: 0.72rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+  .nbc-time  { font-size: 1.3rem; font-weight: 700; color: var(--text); }
+  .nbc-type  { font-size: 0.75rem; color: var(--text2); }
+  .nbc-countdown { font-size: 1.6rem; font-weight: 700; color: var(--accent); min-width: 60px; text-align: right; }
+  #todayScheduleBox { margin-bottom: 12px; }
+  #todayScheduleBox summary {
+    font-size: 0.78rem; color: var(--text2); cursor: pointer; padding: 4px 0;
+    list-style: none; display: flex; align-items: center; gap: 5px;
+  }
+  #todayScheduleBox summary::-webkit-details-marker { display: none; }
+  #todayScheduleBox summary::before { content: "▶ "; font-size: 0.6rem; transition: transform 0.2s; }
+  #todayScheduleBox[open] summary::before { content: "▼ "; }
+  .sched-header, .sched-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    font-size: 0.75rem; padding: 5px 6px; border-radius: 5px; gap: 4px; text-align: center;
+  }
+  .sched-header { color: var(--text2); font-size: 0.68rem; font-weight: 600; }
+  .sched-row:nth-child(even) { background: var(--bg2); }
+  .sched-row { color: var(--text); }
+
   /* Durum çubuğu */
   #statusBar {
     background: var(--bg2); border-top: 1px solid var(--bg3); padding: 8px 16px;
@@ -289,6 +317,28 @@
 
     <!-- ZİLLER -->
     <div class="rm-page active" id="page-bells">
+
+      <!-- Sonraki Zil Kartı -->
+      <div id="nextBellCard">
+        <div class="nbc-left">
+          <div class="nbc-label">Sonraki Zil</div>
+          <div class="nbc-time" id="nbcTime">—</div>
+          <div class="nbc-type" id="nbcType"></div>
+        </div>
+        <div class="nbc-countdown" id="nbcCountdown">—</div>
+      </div>
+
+      <!-- Bugünün Programı (açılır) -->
+      <details id="todayScheduleBox">
+        <summary>📋 Bugünün programını göster</summary>
+        <div id="todayScheduleInner" style="margin-top:6px;">
+          <div class="sched-header">
+            <span>📚 Öğrenci</span><span>👩‍🏫 Öğretmen</span><span>🏃 Teneffüs</span>
+          </div>
+          <div id="schedRows" style="color:var(--text2);font-size:0.78rem;text-align:center;padding:6px;">Yükleniyor…</div>
+        </div>
+      </details>
+
       <div class="section-title">Zil Çal</div>
       <div class="bell-grid">
         <div class="bell-card" onclick="remotePlayBell('student')">
@@ -414,6 +464,19 @@
         <button class="btn-big btn-primary-big" onclick="changePin()">PIN Değiştir</button>
         <div id="pinChangeMsg" style="font-size:0.85rem;text-align:center;min-height:20px;"></div>
         <hr style="border:none;border-top:1px solid var(--bg3);margin:4px 0;">
+        <!-- Bugünü Tatil İlan Et -->
+        <div style="background:var(--bg2);border:1px solid var(--bg3);border-radius:var(--radius);padding:14px;">
+          <div style="font-size:0.82rem;color:var(--text);font-weight:600;margin-bottom:6px;">🏖️ Bugünü Tatil İlan Et</div>
+          <div style="font-size:0.75rem;color:var(--text2);margin-bottom:10px;">
+            Aktif edilirse bugün hiçbir zil çalmaz. Yarın otomatik sıfırlanır.
+          </div>
+          <button id="holidayBtn" class="btn-big" onclick="toggleHoliday()"
+                  style="background:#16a34a;color:#fff;width:100%;">
+            Yükleniyor…
+          </button>
+          <div id="holidayMsg" style="font-size:0.78rem;text-align:center;min-height:16px;margin-top:6px;"></div>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--bg3);margin:4px 0;">
         <p style="font-size:0.8rem;color:var(--text2);">Bağlı hesap: <strong id="connectedAs">—</strong></p>
         <button class="btn-big" style="background:var(--bg3);color:var(--text2);" onclick="doLogout()">Çıkış Yap</button>
       </div>
@@ -425,22 +488,7 @@
 </div><!-- mainScreen -->
 
 <script>
-// ── Köprü Sistemi ──────────────────────────────────────────────────────────
-// Render.com üzerindeki köprü sunucusu — telefon buraya bağlanır,
-// köprü komutu okul bilgisayarına iletir.
-const BRIDGE_URL   = 'https://okulzil-bridge.onrender.com';
-// ntfy topic: okul bilgisayarı başlarken kendi topic'ini ntfy.sh'e yayınlar.
-// connect.html bu topic'i okuyarak SERVER_BASE'i belirler.
-// Eğer localStorage'da kayıtlı topic varsa onu kullan, yoksa URL parametresinden al.
-function _getBridgeTopic() {
-  const urlP = new URLSearchParams(location.search).get('topic');
-  if (urlP) { localStorage.setItem('bridgeTopic', urlP); return urlP; }
-  return localStorage.getItem('bridgeTopic') || '';
-}
-const _bridgeTopic = _getBridgeTopic();
-// Tüm API çağrıları köprü üzerinden gider
-const SERVER_BASE  = _bridgeTopic ? `${BRIDGE_URL}/proxy/${_bridgeTopic}` : BRIDGE_URL;
-// ───────────────────────────────────────────────────────────────────────────
+const SERVER_BASE = window.location.origin;
 // Service Worker kaydı — yalnızca HTTPS'de çalışır
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -605,6 +653,7 @@ async function _doLogin() {
       if (ca) ca.textContent = '****' + pin.slice(-2);
       startSSEListener();
       _syncStatus();
+      loadTodaySchedule();
     } else {
       msg.textContent = d.error || 'Hatalı PIN.';
       _pinEntry = '';
@@ -785,6 +834,7 @@ function rmTab(id, btn) {
   document.getElementById('page-' + id).classList.add('active');
   btn.classList.add('active');
   if (id === 'announce') checkMicrophoneSupport();
+  if (id === 'bells') loadTodaySchedule();
 }
 
 // ---- API çağrıları ----
@@ -877,6 +927,121 @@ async function remotePlayCeremony(key) {
       bar.textContent = '✓ Tören başlatıldı. Tekrar basarak durdurabilirsiniz.';
     } else { bar.textContent = '✗ Hata: ' + d.error; }
   } catch(e) { bar.textContent = '✗ ' + e.message; }
+}
+
+// ---- Bugünün Programı + Sonraki Zil ----
+let _scheduleData  = null;
+let _countdownTimer = null;
+
+async function loadTodaySchedule() {
+  try {
+    const r = await fetch(`${SERVER_BASE}/api/remote/today-schedule?pin=${encodeURIComponent(_pin)}`,
+                          { headers: { 'X-Remote-Pin': _pin } });
+    const d = await r.json();
+    if (!d.ok) return;
+    _scheduleData = d;
+    _renderNextBell(d);
+    _renderScheduleRows(d);
+    _renderHolidayBtn(d.is_holiday);
+  } catch(e) {}
+}
+
+function _bellTypeLabel(t) {
+  return t === 'student' ? '📚 Öğrenci' : t === 'teacher' ? '👩‍🏫 Öğretmen' : '🏃 Teneffüs';
+}
+
+function _renderNextBell(d) {
+  const card  = document.getElementById('nextBellCard');
+  const tEl   = document.getElementById('nbcTime');
+  const tyEl  = document.getElementById('nbcType');
+  const cdEl  = document.getElementById('nbcCountdown');
+  if (!card) return;
+  if (d.is_holiday) {
+    card.className = 'holiday';
+    tEl.textContent  = 'Tatil Günü';
+    tyEl.textContent = 'Bugün zil çalmıyor';
+    cdEl.textContent = '🏖️';
+    if (_countdownTimer) { clearInterval(_countdownTimer); _countdownTimer = null; }
+    return;
+  }
+  card.className = '';
+  if (!d.next_bell) {
+    tEl.textContent  = 'Program bitti';
+    tyEl.textContent = 'Bugün başka zil yok';
+    cdEl.textContent = '—';
+    if (_countdownTimer) { clearInterval(_countdownTimer); _countdownTimer = null; }
+    return;
+  }
+  tEl.textContent  = d.next_bell.time;
+  tyEl.textContent = _bellTypeLabel(d.next_bell.type);
+  _startCountdown(d.next_bell.time, cdEl);
+}
+
+function _startCountdown(hhmm, el) {
+  if (_countdownTimer) clearInterval(_countdownTimer);
+  function _tick() {
+    const now  = new Date();
+    const [h, m] = hhmm.split(':').map(Number);
+    const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+    const diff   = Math.round((target - now) / 1000);
+    if (diff <= 0) { el.textContent = '🔔'; loadTodaySchedule(); return; }
+    const mm = Math.floor(diff / 60);
+    const ss = diff % 60;
+    el.textContent = mm > 0 ? `${mm}dk` : `${ss}sn`;
+  }
+  _tick();
+  _countdownTimer = setInterval(_tick, 1000);
+}
+
+function _renderScheduleRows(d) {
+  const box = document.getElementById('schedRows');
+  if (!box) return;
+  if (d.is_holiday) { box.textContent = '🏖️ Bugün tatil — zil çalmıyor.'; return; }
+  if (!d.schedule || d.schedule.length === 0) { box.textContent = 'Bugün için program yok.'; return; }
+  box.innerHTML = d.schedule.map(row =>
+    `<div class="sched-row">
+      <span>${row.student || '—'}</span>
+      <span>${row.teacher || '—'}</span>
+      <span>${row.end     || '—'}</span>
+    </div>`
+  ).join('');
+}
+
+function _renderHolidayBtn(isHoliday) {
+  const btn = document.getElementById('holidayBtn');
+  const msg = document.getElementById('holidayMsg');
+  if (!btn) return;
+  if (isHoliday) {
+    btn.style.background = '#dc2626';
+    btn.textContent = '✅ Tatil Aktif — İptal Et';
+  } else {
+    btn.style.background = '#16a34a';
+    btn.textContent = '🏖️ Bugünü Tatil İlan Et';
+  }
+  if (msg) msg.textContent = '';
+}
+
+async function toggleHoliday() {
+  const btn = document.getElementById('holidayBtn');
+  const msg = document.getElementById('holidayMsg');
+  if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
+  try {
+    const d = await _post('/api/remote/toggle-holiday', {});
+    if (d.ok) {
+      _renderHolidayBtn(d.is_holiday);
+      if (_scheduleData) _scheduleData.is_holiday = d.is_holiday;
+      if (_scheduleData) _renderNextBell(_scheduleData);
+      if (_scheduleData) _renderScheduleRows(_scheduleData);
+      if (msg) { msg.style.color = '#4ade80'; msg.textContent = d.is_holiday ? 'Bugün tatil ilan edildi.' : 'Tatil iptal edildi.'; }
+    } else {
+      if (msg) { msg.style.color = '#ef4444'; msg.textContent = d.error || 'Hata oluştu.'; }
+      _renderHolidayBtn(_scheduleData ? _scheduleData.is_holiday : false);
+    }
+  } catch(e) {
+    if (msg) { msg.style.color = '#ef4444'; msg.textContent = 'Bağlantı hatası.'; }
+    _renderHolidayBtn(_scheduleData ? _scheduleData.is_holiday : false);
+  }
+  if (btn) btn.disabled = false;
 }
 
 async function remoteStopAll() {
