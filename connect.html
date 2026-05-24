@@ -722,8 +722,9 @@ async function _doLogin() {
   const loginBtn = document.getElementById('pinLoginBtn');
   if (loginBtn) loginBtn.disabled = true;
   try {
+    msg.textContent = 'Bağlanılıyor… (ilk bağlantı 30-60 sn sürebilir)';
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 8000);
+    const tid = setTimeout(() => ctrl.abort(), 45000);
     const r = await fetch(`${SERVER_BASE}/api/remote/ping?pin=${encodeURIComponent(pin)}`, { signal: ctrl.signal });
     clearTimeout(tid);
     const d = await r.json();
@@ -749,8 +750,8 @@ async function _doLogin() {
   } catch(e) {
     const isTimeout = e.name === 'AbortError';
     msg.textContent = isTimeout
-      ? 'Zaman aşımı — sunucu cevap vermedi. Programın çalıştığını kontrol edin.'
-      : 'Bağlantı hatası: ' + e.message;
+      ? 'Bağlantı zaman aşımına uğradı. Sunucu uyku modunda olabilir — lütfen 1-2 dakika sonra tekrar deneyin.'
+      : 'Bağlantı hatası. Sunucu uyku modunda olabilir — lütfen 1-2 dakika sonra tekrar deneyin.';
     _pinEntry = '';
     _updatePinDisplay();
     if (loginBtn) loginBtn.disabled = true;
